@@ -134,37 +134,78 @@ COAPTransport.prototype._setup_server = function () {
             }
 
             var user = iotdb.users.owner();  // TD: WRONG! needs to be the CoAP counterparty
+            var is_observe = req.headers['Observe'] === 0;
 
             if (req.method === "GET") {
-            } else if (req.method === "PUT") {
-            } else {
-            }
-            if (req.url === "/.well-known/core") {
-                res.setOption("Content-Format", "application/link-format");
-                self._get_well_known(_done);
-            } else if (req.url === self.root) {
-                self._get_things({
-                    id: null,
-                    band: null,
-                    user: user,
-                }, _done);
-            } else if (req.url.indexOf(self.root_slash) === 0) {
-                var parts = self.initd.unchannel(self.initd, req.url);
-                if (parts[1] === '.') {
-                    self._get_thing_bands({
-                        id: parts[0],
+                if (req.url === "/.well-known/core") {
+                    res.setOption("Content-Format", "application/link-format");
+                    self._get_well_known(_done);
+                } else if (req.url === self.root) {
+                    self._get_things({
+                        id: null,
                         band: null,
                         user: user,
                     }, _done);
+                } else if (req.url.indexOf(self.root_slash) === 0) {
+                    var parts = self.initd.unchannel(self.initd, req.url);
+                    if (parts[1] === '.') {
+                        self._get_thing_bands({
+                            id: parts[0],
+                            band: null,
+                            user: user,
+                        }, _done);
+                    } else {
+                        self._get_thing_band({
+                            id: parts[0],
+                            band: parts[1],
+                            user: user,
+                        }, _done);
+                    }
                 } else {
-                    self._get_thing_band({
-                        id: parts[0],
-                        band: parts[1],
-                        user: user,
-                    }, _done);
+                    _done(new Error("not found", null));
+                }
+            } else if (req.method === "PUT") {
+                if (req.url.indexOf(self.root_slash) === 0) {
+                    var parts = self.initd.unchannel(self.initd, req.url);
+                    if (parts[1] === '.') {
+                        _done(new Error("bad PUT"), null);
+                        return;
+                    }
+
+                    var buffers = [];
+                    req.on('readable', function () {
+                        while (true) {
+                            var buffer = req.read();
+                            if (!buffer) {
+                                return;
+                            }
+
+                            buffers.push(buffer.toString('utf-8'));
+                        }
+                    });
+
+                    req.on('end', function () {
+                        var buffer = buffers.join("");
+                        var value;
+                        try {
+                            value = JSON.parse(buffer);
+                        } catch (x) {
+                            _done(x, null);
+                            return;
+                        }
+
+                        self._put_thing_band({
+                            id: parts[0],
+                            band: parts[1],
+                            value: value,
+                            user: user,
+                        }, _done);
+                    });
+                } else {
+                    _done(new Error("bad PUT"), null);
                 }
             } else {
-                done(null, {});
+                _done(new Error("bad method"), null);
             }
 
         } catch (x) {
@@ -267,6 +308,42 @@ COAPTransport.prototype._get_thing_band = function (paramd, done) {
     });
 };
 
+COAPTransport.prototype._put_thing_band = function (paramd, done) {
+    var self = this;
+    var ids = [];
+
+    self.get({
+        id: paramd.id,
+        band: paramd.band,
+        value: paramd.value,
+        user: paramd.user,
+    }, function (ld) {
+        if (ld.error) {
+            done(ld.error);
+            done = noop;
+            return;
+        }
+
+        _.timestamp.update(paramd.value);
+
+        self._emitter.emit("updated", {
+            id: paramd.id,
+            band: paramd.band,
+            value: paramd.value,
+            user: paramd.user,
+        });
+
+        // kinda a BS result
+        var rd = {
+            "@id": self.initd.channel(self.initd, paramd.id, paramd.band),
+            "@context": "https://iotdb.org/pub/iot",
+        };
+
+        done(null, rd);
+        done = noop;
+    });
+};
+
 /* --- methods --- */
 
 /**
@@ -356,6 +433,19 @@ COAPTransport.prototype.updated = function (paramd, callback) {
     }
 
     self._validate_updated(paramd, callback);
+
+    self._emitter.on("updated", function (ud) {
+        if (paramd.id && (ud.id !== paramd.id)) {
+            return;
+        }
+        if (paramd.band && (ud.band !== paramd.band)) {
+            return;
+        }
+
+        callback(ud, function(rud) {
+            // really should do something here
+        });
+    });
 };
 
 /**
