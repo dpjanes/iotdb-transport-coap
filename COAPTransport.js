@@ -135,6 +135,10 @@ COAPTransport.prototype._setup_server = function () {
 
             var user = iotdb.users.owner();  // TD: WRONG! needs to be the CoAP counterparty
 
+            if (req.method === "GET") {
+            } else if (req.method === "PUT") {
+            } else {
+            }
             if (req.url === "/.well-known/core") {
                 res.setOption("Content-Format", "application/link-format");
                 self._get_well_known(_done);
