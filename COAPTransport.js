@@ -39,10 +39,12 @@ var logger = iotdb.logger({
     module: 'COAPTransport',
 });
 
+var noop = function() {};
+
 /* --- constructor --- */
 
 /**
- *  Create a transport for Plugfest.
+ *  Create a transport for CoAP.
  */
 var COAPTransport = function (initd) {
     var self = this;
@@ -53,11 +55,14 @@ var COAPTransport = function (initd) {
             unchannel: iotdb_transport.unchannel,
         },
         iotdb.keystore().get("/transports/COAPTransport/initd"), {
-            prefix: "",
+            prefix: "/ts",
             server_host: null,
             server_port: 22001,
         }
     );
+
+    self.root = self.initd.channel(self.initd);
+    self.root_slash = self.root + "/";
 
     self._emitter = new events.EventEmitter();
     self.native = null;
@@ -67,33 +72,31 @@ var COAPTransport = function (initd) {
         self._setup_server();
     });
 
-    _.net.external.ipv4(function (error, ipv4) {
-        if (self.initd.server_host) {
-            ipv4 = self.initd.server_host;
-        } else if (error) {
-            ipv4 = _.net.ipv4();
+    var ipv4;
+    if (!_.is.Empty(self.initd.server_host)) {
+        ipv4 = self.initd.server_host;
+    } else {
+        ipv4 = "0.0.0.0";
+    }
+
+    var server = coap.createServer();
+    server.listen(self.initd.server_port, ipv4, function (error) {
+        if (error) {
+            console.log("ERROR", error);
+            return;
         }
 
-        var server = coap.createServer();
-        // server.listen(self.initd.server_port, "0.0.0.0", function (error) {
-        server.listen(self.initd.server_port, "0.0.0.0", function (error) {
-            if (error) {
-                console.log("ERROR", error);
-                return;
-            }
+        self.server_url = "coap://" + ipv4 + ":" + self.initd.server_port;
 
-            self.server_url = "coap://" + ipv4 + ":" + self.initd.server_port;
+        console.log("===============================");
+        console.log("=== CoAP Server Up");
+        console.log("=== ");
+        console.log("=== Connect at:");
+        console.log("=== " + self.server_url);
+        console.log("===============================");
 
-            console.log("===============================");
-            console.log("=== Plugfest CoAP Server Up");
-            console.log("=== ");
-            console.log("=== Connect at:");
-            console.log("=== " + self.server_url);
-            console.log("===============================");
-
-            self.native = server;
-            self._emitter.emit("server-ready");
-        });
+        self.native = server;
+        self._emitter.emit("server-ready");
     });
 };
 
@@ -114,12 +117,14 @@ COAPTransport.prototype._setup_server = function () {
 
             var _done = function(error, content) {
                 if (error) {
-                    request.code = 500;
+                    res.code = 500;
+                    content = { error: _.error.message(error) };
                 }
 
                 if (content) {
                     if (_.is.Dictionary(content)) {
                         content = JSON.stringify(content);
+                        res.setOption("Content-Format", "application/json");
                     }
 
                     res.write(content);
@@ -128,10 +133,32 @@ COAPTransport.prototype._setup_server = function () {
                 res.end();
             }
 
+            var user = iotdb.users.owner();  // TD: WRONG! needs to be the CoAP counterparty
+
             if (req.url === "/.well-known/core") {
+                res.setOption("Content-Format", "application/link-format");
                 self._get_well_known(_done);
-            } else if (req.url === "/bulletins") {
-                self._get_bulletins(_done);
+            } else if (req.url === self.root) {
+                self._get_things({
+                    id: null,
+                    band: null,
+                    user: user,
+                }, _done);
+            } else if (req.url.indexOf(self.root_slash) === 0) {
+                var parts = self.initd.unchannel(self.initd, req.url);
+                if (parts[1] === '.') {
+                    self._get_thing_bands({
+                        id: parts[0],
+                        band: null,
+                        user: user,
+                    }, _done);
+                } else {
+                    self._get_thing_band({
+                        id: parts[0],
+                        band: parts[1],
+                        user: user,
+                    }, _done);
+                }
             } else {
                 done(null, {});
             }
@@ -149,18 +176,91 @@ COAPTransport.prototype._setup_server = function () {
 
 COAPTransport.prototype._get_well_known = function (done) {
     var self = this;
-    
+
     var resultd = {};
-    resultd["/.well-known/core"] = {
-        ct: 65202,
-    };
-    resultd["/bulletins"] = {};
+    resultd["/.well-known/core"] = {};
+    resultd[self.root] = {};
 
     iotdb_links.produce(resultd, done);
 };
 
-COAPTransport.prototype._get_bulletins = function (done) {
-    done(null, {});
+COAPTransport.prototype._get_things = function (paramd, done) {
+    var self = this;
+    var ids = [];
+
+    self.list({
+        user: paramd.user,
+    }, function (ld) {
+        if (ld.error) {
+            done(ld.error);
+            done = noop;
+        } else if (ld.end) {
+            var rd = {
+                "@id": self.initd.channel(self.initd),
+                "@context": "https://iotdb.org/pub/iot",
+                "things": ids,
+            };
+
+            done(null, rd);
+            done = noop;
+        }
+
+        ids.push("./" + ld.id);
+    });
+};
+
+COAPTransport.prototype._get_thing_bands = function (paramd, done) {
+    var self = this;
+    var ids = [];
+
+    self.about({
+        id: paramd.id,
+        user: paramd.user,
+    }, function (ld) {
+        if (ld.error) {
+            done(ld.error);
+            done = noop;
+        } else {
+            var rd = {
+                "@id": self.initd.channel(self.initd, paramd.id),
+                "@context": "https://iotdb.org/pub/iot",
+            };
+
+            var bands = _.ld.list(ld, "bands", []);
+            bands.map(function(band) {
+                rd[band] = "./" + band;
+            });
+
+            done(null, rd);
+            done = noop;
+        }
+    });
+};
+
+COAPTransport.prototype._get_thing_band = function (paramd, done) {
+    var self = this;
+    var ids = [];
+
+    self.get({
+        id: paramd.id,
+        band: paramd.band,
+        user: paramd.user,
+    }, function (ld) {
+        if (ld.error) {
+            done(ld.error);
+            done = noop;
+        } else {
+            var rd = {
+                "@id": self.initd.channel(self.initd, paramd.id, paramd.band),
+                "@context": "https://iotdb.org/pub/iot",
+            };
+
+            rd = _.d.compose.shallow(rd, ld.value);
+
+            done(null, rd);
+            done = noop;
+        }
+    });
 };
 
 /* --- methods --- */

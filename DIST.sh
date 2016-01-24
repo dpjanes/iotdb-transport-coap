@@ -6,8 +6,6 @@
 #   2016-01-24
 #
 
-exit 0
-
 PACKAGE=iotdb-transport-coap
 DIST_ROOT=/var/tmp/.dist.$$
 
