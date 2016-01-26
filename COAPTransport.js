@@ -33,6 +33,7 @@ var path = require('path');
 var events = require('events');
 var util = require('util');
 var url = require('url');
+var querystring = require('querystring');
 
 var logger = iotdb.logger({
     name: 'iotdb-transport-plugfest',
@@ -68,6 +69,10 @@ var COAPTransport = function (initd) {
     self.native = null;
     self.server_url = null;
 
+    self._id2alias = {};
+    self._alias2id = {};
+    self._acount = 0;
+
     self._emitter.on("server-ready", function() {
         self._setup_server();
     });
@@ -76,7 +81,7 @@ var COAPTransport = function (initd) {
     if (!_.is.Empty(self.initd.server_host)) {
         ipv4 = self.initd.server_host;
     } else {
-        ipv4 = "0.0.0.0";
+        ipv4 = _.net.ipv4();
     }
 
     var server = coap.createServer();
@@ -108,106 +113,11 @@ COAPTransport.prototype._setup_server = function () {
     var self = this;
 
     self.native.on('request', function (req, res) {
+        console.log("=========");
+        console.log("==", req.url);
+        console.log("=========");
         try {
-            logger.info({
-                method: "_setup_server/on('request')",
-                request_url: req.url,
-                request_method: req.method,
-            }, "CoAP request");
-
-            var _done = function(error, content) {
-                if (error) {
-                    res.code = 500;
-                    content = { error: _.error.message(error) };
-                }
-
-                if (content) {
-                    if (_.is.Dictionary(content)) {
-                        content = JSON.stringify(content);
-                        res.setOption("Content-Format", "application/json");
-                    }
-
-                    res.write(content);
-                }
-
-                res.end();
-            }
-
-            var user = iotdb.users.owner();  // TD: WRONG! needs to be the CoAP counterparty
-            var is_observe = req.headers['Observe'] === 0;
-
-            if (req.method === "GET") {
-                if (req.url === "/.well-known/core") {
-                    res.setOption("Content-Format", "application/link-format");
-                    self._get_well_known(_done);
-                } else if (req.url === self.root) {
-                    self._get_things({
-                        id: null,
-                        band: null,
-                        user: user,
-                    }, _done);
-                } else if (req.url.indexOf(self.root_slash) === 0) {
-                    var parts = self.initd.unchannel(self.initd, req.url);
-                    if (parts[1] === '.') {
-                        self._get_thing_bands({
-                            id: parts[0],
-                            band: null,
-                            user: user,
-                        }, _done);
-                    } else {
-                        self._get_thing_band({
-                            id: parts[0],
-                            band: parts[1],
-                            user: user,
-                        }, _done);
-                    }
-                } else {
-                    _done(new Error("not found", null));
-                }
-            } else if (req.method === "PUT") {
-                if (req.url.indexOf(self.root_slash) === 0) {
-                    var parts = self.initd.unchannel(self.initd, req.url);
-                    if (parts[1] === '.') {
-                        _done(new Error("bad PUT"), null);
-                        return;
-                    }
-
-                    var buffers = [];
-                    req.on('readable', function () {
-                        while (true) {
-                            var buffer = req.read();
-                            if (!buffer) {
-                                return;
-                            }
-
-                            buffers.push(buffer.toString('utf-8'));
-                        }
-                    });
-
-                    req.on('end', function () {
-                        var buffer = buffers.join("");
-                        var value;
-                        try {
-                            value = JSON.parse(buffer);
-                        } catch (x) {
-                            _done(x, null);
-                            return;
-                        }
-
-                        self._put_thing_band({
-                            id: parts[0],
-                            band: parts[1],
-                            value: value,
-                            user: user,
-                        }, _done);
-                    });
-                } else {
-                    _done(new Error("bad PUT"), null);
-                }
-            } else {
-                _done(new Error("bad method"), null);
-            }
-
+            self._handle_request(req, res);
         } catch (x) {
             logger.error({
                 method: "_setup_server/on('request')",
@@ -216,22 +126,181 @@ COAPTransport.prototype._setup_server = function () {
             }, "unexpected exception");
         }
     });
-
 };
 
-COAPTransport.prototype._get_well_known = function (done) {
+COAPTransport.prototype._handle_request = function (req, res) {
+    var self = this;
+    var user = iotdb.users.owner();  // TD: WRONG! needs to be the CoAP counterparty
+    var urlp = url.parse(req.url);
+    var query = querystring.parse(urlp.query) || {};
+
+    logger.info({
+        method: "_setup_server/_handle_request",
+        request_url: req.url,
+        request_method: req.method,
+    }, "CoAP request");
+
+    var _done = function(error, content) {
+        if (error) {
+            res.code = 500;
+            content = { error: _.error.message(error) };
+        }
+
+        content = content || "";
+
+        if (_.is.Dictionary(content)) {
+            var cf = content["@cf"];
+            if (cf) {
+                delete content["@cf"];
+            } else {
+                cf = "application/json";
+            }
+
+            if (cf === "application/link-format") {
+                res.setOption("Content-Format", cf);
+                iotdb_links.produce(content, _done);
+            } else {
+                res.setOption("Content-Format", "application/json");
+                _done(null, JSON.stringify(content));
+            }
+
+            return
+        }
+
+        res.write(content);
+        res.end();
+    };
+
+    var _handle_get_core = function() {
+        self._get_core(_done);
+    };
+
+    var _handle_get_things = function() {
+        self._get_things({
+            id: null,
+            band: null,
+            user: user,
+            next: query.next,
+        }, _done);
+    };
+
+    var _handle_get_thing = function(id) {
+        self._get_thing({
+            id: id,
+            band: null,
+            user: user,
+        }, _done);
+    };
+
+    var _handle_get_band = function(id, band) {
+        self._get_band({
+            id: id,
+            band: band,
+            user: user,
+        }, _done);
+    };
+
+    var _handle_get = function() {
+        if (urlp.pathname === "/.well-known/core") {
+            _handle_get_core();
+        } else if (urlp.pathname === self.root) {
+            _handle_get_things();
+        } else if (urlp.pathname.indexOf(self.root_slash) === 0) {
+            var parts = self.initd.unchannel(self.initd, urlp.pathname);
+            if (parts[1] === '.') {
+                console.log("HEREXXX", self.alias2id(parts[0]), parts[0], self._alias2id, self._id2alias);
+                _handle_get_thing(self.alias2id(parts[0]));
+            } else {
+                _handle_get_band(self.alias2id(parts[0]), parts[1]);
+            }
+        } else {
+            _done(new Error("not found", null));
+        }
+    };
+
+    var _handle_observe = function() {
+        _done(new Error("observe not implemented", null));
+    };
+
+    var _handle_put = function() {
+        if (urlp.pathname.indexOf(self.root_slash) !== 0) {
+            _done(new Error("bad PUT"), null);
+            return;
+        }
+
+        var parts = self.initd.unchannel(self.initd, urlp.pathname);
+        if (parts[1] === '.') {
+            _done(new Error("bad PUT"), null);
+            return;
+        }
+
+        var buffers = [];
+        req.on('readable', function () {
+            while (true) {
+                var buffer = req.read();
+                if (!buffer) {
+                    return;
+                }
+
+                buffers.push(buffer.toString('utf-8'));
+            }
+        });
+
+        req.on('end', function () {
+            var buffer = buffers.join("");
+            var value;
+            try {
+                value = JSON.parse(buffer);
+            } catch (x) {
+                _done(x, null);
+                return;
+            }
+
+            self._put_thing_band({
+                id: self.alias2id(parts[0]),
+                band: parts[1],
+                value: value,
+                user: user,
+            }, _done);
+        });
+    };
+
+    if (req.method === "GET") {
+        if (req.headers['Observe'] === 0) {
+            _handle_observe();
+        } else {
+            _handle_get();
+        }
+    } else if (req.method === "PUT") {
+        _handle_put();
+    } else {
+        _done(new Error("bad method"), null);
+    }
+};
+
+COAPTransport.prototype._get_core = function (done) {
     var self = this;
 
     var resultd = {};
     resultd["/.well-known/core"] = {};
-    resultd[self.root] = {};
+    resultd[self.root] = {
+        // "cf": 40, // "application/link-format",
+        // "rel": "section",
+        // "type": "application/link-format",
+    };
+    resultd["@cf"] = "application/link-format";
 
-    iotdb_links.produce(resultd, done);
+    done(null, resultd);
 };
 
 COAPTransport.prototype._get_things = function (paramd, done) {
     var self = this;
     var ids = [];
+
+    var next_seen = true;
+    if (paramd.next) {
+        next_seen = false;
+    }
 
     self.list({
         user: paramd.user,
@@ -246,15 +315,70 @@ COAPTransport.prototype._get_things = function (paramd, done) {
                 "things": ids,
             };
 
+            var next = null;
+            while (true && ids.length) {
+                var content = JSON.stringify(rd);
+                if (content.length < 800) {
+                    break;
+                }
+
+                var px = Math.floor(ids.length / 2);
+                next = ids[px];
+                ids.splice(px);
+            }
+
+            if (next) {
+                rd.next = next;
+            }
+
             done(null, rd);
             done = noop;
+        } else {
+            var id = self.id2alias(ld.id);
+            if (!next_seen && (id === paramd.next)) {
+                next_seen = true;
+            }
+            if (next_seen) {
+                ids.push("" + id);
+            }
         }
 
-        ids.push("./" + ld.id);
     });
 };
 
-COAPTransport.prototype._get_thing_bands = function (paramd, done) {
+/**
+ *  A work in progres
+ */
+COAPTransport.prototype._directory_things = function (paramd, done) {
+    var self = this;
+    var ids = [];
+
+    self.list({
+        user: paramd.user,
+    }, function (ld) {
+        if (ld.error) {
+            done(ld.error);
+            done = noop;
+        } else if (ld.end) {
+            var rd = {
+                "@cf": "application/link-format"
+            };
+            ids.map(function(id) {
+                rd["/ts/" + id] = {
+                    "cf": 40,
+                }
+            });
+
+            done(null, rd);
+            done = noop;
+        } else {
+            ids.push("" + self.id2alias(ld.id));
+        }
+
+    });
+};
+
+COAPTransport.prototype._get_thing = function (paramd, done) {
     var self = this;
     var ids = [];
 
@@ -267,14 +391,26 @@ COAPTransport.prototype._get_thing_bands = function (paramd, done) {
             done = noop;
         } else {
             var rd = {
-                "@id": self.initd.channel(self.initd, paramd.id),
+                "@id": self.initd.channel(self.initd, self.id2alias(paramd.id)),
                 "@context": "https://iotdb.org/pub/iot",
+                "thing-id": paramd.id,
             };
 
-            var bands = _.ld.list(ld, "bands", []);
-            bands.map(function(band) {
-                rd[band] = "./" + band;
-            });
+            if (ld.bandd) {
+                _.mapObject(ld.bandd, function(url, band) {
+                    if (url) {
+                        rd[band] = url;
+                    } else {
+                        rd[band] = "./" + band;
+                    }
+                });
+            } else {
+                var bands = _.ld.list(ld, "bands", []);
+                bands.map(function(band) {
+                    rd[band] = "./" + band;
+                });
+            }
+
 
             done(null, rd);
             done = noop;
@@ -282,7 +418,7 @@ COAPTransport.prototype._get_thing_bands = function (paramd, done) {
     });
 };
 
-COAPTransport.prototype._get_thing_band = function (paramd, done) {
+COAPTransport.prototype._get_band = function (paramd, done) {
     var self = this;
     var ids = [];
 
@@ -296,8 +432,11 @@ COAPTransport.prototype._get_thing_band = function (paramd, done) {
             done = noop;
         } else {
             var rd = {
+                /*
+                 *  CoAP is really restrained
                 "@id": self.initd.channel(self.initd, paramd.id, paramd.band),
                 "@context": "https://iotdb.org/pub/iot",
+                 */
             };
 
             rd = _.d.compose.shallow(rd, ld.value);
@@ -326,7 +465,7 @@ COAPTransport.prototype._put_thing_band = function (paramd, done) {
 
         _.timestamp.update(paramd.value);
 
-        self._emitter.emit("updated", {
+        self._emitter.emit("request-updated", {
             id: paramd.id,
             band: paramd.band,
             value: paramd.value,
@@ -335,7 +474,7 @@ COAPTransport.prototype._put_thing_band = function (paramd, done) {
 
         // kinda a BS result
         var rd = {
-            "@id": self.initd.channel(self.initd, paramd.id, paramd.band),
+            "@id": self.initd.channel(self.initd, self.alias2id(paramd.id), paramd.band),
             "@context": "https://iotdb.org/pub/iot",
         };
 
@@ -405,20 +544,10 @@ COAPTransport.prototype.update = function (paramd, callback) {
 
     self._validate_update(paramd, callback);
 
-    /*
-    var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
-    var d = self.initd.pack(paramd.value, paramd.id, paramd.band);
+    paramd = _.shallowCopy(paramd);
 
-    logger.error({
-        method: "update",
-        channel: channel,
-        d: d,
-    }, "NOT IMPLEMENTED");
-    */
-
-    callback({
-        error: new Error("not implemented"),
-    });
+    self._emitter.emit("has-update", paramd);
+    callback(paramd);
 };
 
 /**
@@ -434,7 +563,7 @@ COAPTransport.prototype.updated = function (paramd, callback) {
 
     self._validate_updated(paramd, callback);
 
-    self._emitter.on("updated", function (ud) {
+    self._emitter.on("request-updated", function (ud) {
         if (paramd.id && (ud.id !== paramd.id)) {
             return;
         }
@@ -460,6 +589,37 @@ COAPTransport.prototype.remove = function (paramd, callback) {
 };
 
 /* --- internals --- */
+COAPTransport.prototype.id2alias = function (id) {
+    var self = this;
+
+    return id;
+
+    /*
+    var alias = self._id2alias[id];
+    if (alias) {
+        return alias;
+    }
+
+    alias = id;
+    alias = alias.replace(/^.*:/, '');
+    alias = _.id.to_camel_case(alias);
+    alias = alias + (self._acount++);
+    self._id2alias[id] = alias;
+    self._alias2id[alias] = id;
+
+    console.log("HERE:YYY", self.
+
+    return alias;
+    */
+};
+
+COAPTransport.prototype.alias2id = function (alias) {
+    return alias;
+    /*
+    return this._alias2id[alias] || null;
+     */
+};
+
 
 /**
  *  API
