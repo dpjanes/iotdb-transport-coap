@@ -140,7 +140,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
         request_method: req.method,
     }, "CoAP request");
 
-    var _done = function(error, content) {
+    var _done = function(error, content, no_end) {
         if (error) {
             res.code = 500;
             content = { error: _.error.message(error) };
@@ -161,14 +161,17 @@ COAPTransport.prototype._handle_request = function (req, res) {
                 iotdb_links.produce(content, _done);
             } else {
                 res.setOption("Content-Format", "application/json");
-                _done(null, JSON.stringify(content));
+                _done(null, JSON.stringify(content) + "\n", no_end);
             }
 
             return
         }
 
         res.write(content);
-        res.end();
+
+        if (!no_end) {
+            res.end();
+        } 
     };
 
     var _handle_get_core = function() {
@@ -200,6 +203,47 @@ COAPTransport.prototype._handle_request = function (req, res) {
         }, _done);
     };
 
+    var _handle_observe_band = function(id, band) {
+        self._get_band({
+            id: id,
+            band: band,
+            user: user,
+        }, function(error, result) {
+            if (error) {
+                return _done(error, result);
+            }
+
+            _done(null, result, true);
+
+            var _emitted = function(ud) {
+                if (ud.id !== id) {
+                    return;
+                }
+                if (ud.band !== band) {
+                    return;
+                }
+
+                self._get_band({
+                    id: id,
+                    band: band,
+                    user: user,
+                }, function(error, result) {
+                    if (error) {
+                        return;
+                    }
+
+                    _done(null, result, true);
+                });
+            };
+
+            self._emitter.on("has-update", _emitted);
+
+            res.on("error", function() {
+                self._emitter.removeListener("has-update", _emitted);
+            });
+        });
+    };
+
     var _handle_get = function() {
         if (urlp.pathname === "/.well-known/core") {
             _handle_get_core();
@@ -208,7 +252,6 @@ COAPTransport.prototype._handle_request = function (req, res) {
         } else if (urlp.pathname.indexOf(self.root_slash) === 0) {
             var parts = self.initd.unchannel(self.initd, urlp.pathname);
             if (parts[1] === '.') {
-                console.log("HEREXXX", self.alias2id(parts[0]), parts[0], self._alias2id, self._id2alias);
                 _handle_get_thing(self.alias2id(parts[0]));
             } else {
                 _handle_get_band(self.alias2id(parts[0]), parts[1]);
@@ -219,7 +262,20 @@ COAPTransport.prototype._handle_request = function (req, res) {
     };
 
     var _handle_observe = function() {
-        _done(new Error("observe not implemented", null));
+        if (urlp.pathname === "/.well-known/core") {
+            _handle_get_core();
+        } else if (urlp.pathname === self.root) {
+            _handle_get_things();
+        } else if (urlp.pathname.indexOf(self.root_slash) === 0) {
+            var parts = self.initd.unchannel(self.initd, urlp.pathname);
+            if (parts[1] === '.') {
+                _handle_get_thing(self.alias2id(parts[0]));
+            } else {
+                _handle_observe_band(self.alias2id(parts[0]), parts[1]);
+            }
+        } else {
+            _done(new Error("not found", null));
+        }
     };
 
     var _handle_put = function() {
@@ -277,6 +333,23 @@ COAPTransport.prototype._handle_request = function (req, res) {
         _done(new Error("bad method"), null);
     }
 };
+
+/*
+COAPTransport.prototype._subscribe_updates = function (done) {
+    var self = this;
+
+    if (self._subscribe_updates_done) {
+        return;
+    }
+    self._subscribe_updates_done = true;
+
+    console.log("SUBSCRIBING");
+    self.updated(function(ud) {
+        console.log("UPDATE", ud);
+        self._emitter.emit("update", ud);
+    });
+};
+*/
 
 COAPTransport.prototype._get_core = function (done) {
     var self = this;
