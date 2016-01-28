@@ -457,7 +457,7 @@ COAPTransport.prototype._get_thing = function (paramd, done) {
     var self = this;
     var ids = [];
 
-    self.about({
+    self.bands({
         id: paramd.id,
         user: paramd.user,
     }, function (ld) {
