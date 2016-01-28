@@ -24,6 +24,7 @@
 
 var iotdb = require('iotdb');
 var iotdb_transport = require('iotdb-transport');
+var errors = iotdb_transport.errors;
 var iotdb_links = require('iotdb-links');
 var _ = iotdb._;
 
@@ -142,7 +143,8 @@ COAPTransport.prototype._handle_request = function (req, res) {
 
     var _done = function(error, content, no_end) {
         if (error) {
-            res.code = 500;
+            console.log("HERE:XXX", error);
+            res.code = _.error.code(error);
             content = { error: _.error.message(error) };
         }
 
@@ -257,7 +259,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
                 _handle_get_band(self.alias2id(parts[0]), parts[1]);
             }
         } else {
-            _done(new Error("not found", null));
+            _done(new errors.NotFound(), null);
         }
     };
 
@@ -274,19 +276,19 @@ COAPTransport.prototype._handle_request = function (req, res) {
                 _handle_observe_band(self.alias2id(parts[0]), parts[1]);
             }
         } else {
-            _done(new Error("not found", null));
+            _done(new errors.NotFound(), null);
         }
     };
 
     var _handle_put = function() {
         if (urlp.pathname.indexOf(self.root_slash) !== 0) {
-            _done(new Error("bad PUT"), null);
+            _done(new errors.MethodNotAllowed(), null);
             return;
         }
 
         var parts = self.initd.unchannel(self.initd, urlp.pathname);
         if (parts[1] === '.') {
-            _done(new Error("bad PUT"), null);
+            _done(new errors.MethodNotAllowed(), null);
             return;
         }
 
@@ -330,7 +332,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
     } else if (req.method === "PUT") {
         _handle_put();
     } else {
-        _done(new Error("bad method"), null);
+        _done(new errors.MethodNotAllowed(), null);
     }
 };
 
@@ -602,11 +604,9 @@ COAPTransport.prototype.get = function (paramd, callback) {
 
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
 
-    // callback(id, band, null); does not exist
-    // OR
-    // callback(id, band, undefined); don't know
-    // OR
-    // callback(id, band, d); data
+    callback({
+        error: new errors.NotImplemented(),
+    })
 };
 
 /**
@@ -659,6 +659,10 @@ COAPTransport.prototype.remove = function (paramd, callback) {
     self._validate_remove(paramd, callback);
 
     var channel = self.initd.channel(self.intid, paramd.id, paramd.band);
+
+    callback({
+        error: new errors.NotImplemented(),
+    })
 };
 
 /* --- internals --- */
