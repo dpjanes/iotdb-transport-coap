@@ -612,7 +612,7 @@ COAPTransport.prototype.get = function (paramd, callback) {
 /**
  *  See {iotdb_transport.Transport#Transport} for documentation.
  */
-COAPTransport.prototype.update = function (paramd, callback) {
+COAPTransport.prototype.put = function (paramd, callback) {
     var self = this;
 
     self._validate_update(paramd, callback);
