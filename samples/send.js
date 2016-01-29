@@ -17,7 +17,7 @@ var transport = new Transport({
 var _update = function() {
     var now = (new Date()).toISOString();
     console.log("+ sent update", now);
-    transport.update({
+    transport.put({
         id: "MyThingID", 
         band: "meta", 
         value: {

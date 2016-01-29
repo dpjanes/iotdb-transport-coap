@@ -13,7 +13,7 @@ var Transport = require('../COAPTransport').COAPTransport;
 
 var transport = new Transport({
 });
-transport.updated(function(ud) {
+transport.updated({}, function(ud) {
     if (ud.value === undefined) {
         transport.get(ud, function(gd) {
             console.log("+", gd.id, gd.band, gd.value);
