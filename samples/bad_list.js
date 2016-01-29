@@ -13,8 +13,13 @@ var Transport = require('../COAPTransport').COAPTransport;
 
 var transport = new Transport({
 });
-transport.list({}, function(ld) {
+transport.list({}, function(error, ld) {
+    if (error) {
+        console.log("#", "error", error);
+        return;
+    }
     if (!ld) {
+        console.log("+", "<end>");
         break;
     }
 

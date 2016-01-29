@@ -143,7 +143,6 @@ COAPTransport.prototype._handle_request = function (req, res) {
 
     var _done = function(error, content, no_end) {
         if (error) {
-            console.log("HERE:XXX", error);
             res.code = _.error.code(error);
             content = { error: _.error.message(error) };
         }
@@ -379,36 +378,14 @@ COAPTransport.prototype._get_things = function (paramd, done) {
 
     self.list({
         user: paramd.user,
-    }, function (ld) {
-        if (ld.error) {
-            done(ld.error);
-            done = noop;
-        } else if (ld.end) {
-            var rd = {
-                "@id": self.initd.channel(self.initd),
-                "@context": "https://iotdb.org/pub/iot",
-                "things": ids,
-            };
+    }, function (error, ld) {
+        if (error) {
+            done(error);
+            done = _.noop;
+            return;
+        }
 
-            var next = null;
-            while (true && ids.length) {
-                var content = JSON.stringify(rd);
-                if (content.length < 800) {
-                    break;
-                }
-
-                var px = Math.floor(ids.length / 2);
-                next = ids[px];
-                ids.splice(px);
-            }
-
-            if (next) {
-                rd.next = next;
-            }
-
-            done(null, rd);
-            done = noop;
-        } else {
+        if (ld) {
             var id = self.id2alias(ld.id);
             if (!next_seen && (id === paramd.next)) {
                 next_seen = true;
@@ -416,8 +393,34 @@ COAPTransport.prototype._get_things = function (paramd, done) {
             if (next_seen) {
                 ids.push("" + id);
             }
+
+            return;
         }
 
+        var rd = {
+            "@id": self.initd.channel(self.initd),
+            "@context": "https://iotdb.org/pub/iot",
+            "things": ids,
+        };
+
+        var next = null;
+        while (true && ids.length) {
+            var content = JSON.stringify(rd);
+            if (content.length < 800) {
+                break;
+            }
+
+            var px = Math.floor(ids.length / 2);
+            next = ids[px];
+            ids.splice(px);
+        }
+
+        if (next) {
+            rd.next = next;
+        }
+
+        done(null, rd);
+        done = _.noop;
     });
 };
 
@@ -430,26 +433,27 @@ COAPTransport.prototype._directory_things = function (paramd, done) {
 
     self.list({
         user: paramd.user,
-    }, function (ld) {
-        if (ld.error) {
-            done(ld.error);
-            done = noop;
-        } else if (ld.end) {
-            var rd = {
-                "@cf": "application/link-format"
-            };
-            ids.map(function(id) {
-                rd["/ts/" + id] = {
-                    "cf": 40,
-                }
-            });
-
-            done(null, rd);
-            done = noop;
-        } else {
-            ids.push("" + self.id2alias(ld.id));
+    }, function (error, ld) {
+        if (error) {
+            done(error);
+            return;
         }
 
+        if (ld) {
+            ids.push("" + self.id2alias(ld.id));
+            return;
+        }
+
+        var rd = {
+            "@cf": "application/link-format"
+        };
+        ids.map(function(id) {
+            rd["/ts/" + id] = {
+                "cf": 40,
+            }
+        });
+
+        done(null, rd);
     });
 };
 
@@ -565,12 +569,12 @@ COAPTransport.prototype._put_thing_band = function (paramd, done) {
  */
 COAPTransport.prototype.list = function (paramd, callback) {
     var self = this;
+    var ld;
 
     self._validate_list(paramd, callback);
 
-    callback({
-        end: true,
-    });
+    ld = _.shallowCopy(paramd);
+    callback(new errors.NeverImplemented(), ld);
 };
 
 /**
