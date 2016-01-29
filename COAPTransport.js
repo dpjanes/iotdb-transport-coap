@@ -594,9 +594,7 @@ COAPTransport.prototype.get = function (paramd, callback) {
 
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
 
-    callback({
-        error: new errors.NotImplemented(),
-    })
+    callback(new errors.NotImplemented(), null);
 };
 
 /**

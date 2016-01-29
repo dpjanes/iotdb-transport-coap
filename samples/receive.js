@@ -18,7 +18,11 @@ transport.updated({
     band: "meta", 
 }, function(ud) {
     if (ud.value === undefined) {
-        transport.get(ud, function(gd) {
+        transport.get(ud, function(error, gd) {
+            if (error) {
+                console.log("#", error);
+                return;
+            }
             console.log("+", gd.id, gd.band, gd.value);
         });
     } else {
