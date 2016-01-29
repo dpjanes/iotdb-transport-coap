@@ -41,7 +41,7 @@ var logger = iotdb.logger({
     module: 'COAPTransport',
 });
 
-var noop = function() {};
+var noop = function () {};
 
 /* --- constructor --- */
 
@@ -74,7 +74,7 @@ var COAPTransport = function (initd) {
     self._alias2id = {};
     self._acount = 0;
 
-    self._emitter.on("server-ready", function() {
+    self._emitter.on("server-ready", function () {
         self._setup_server();
     });
 
@@ -131,7 +131,7 @@ COAPTransport.prototype._setup_server = function () {
 
 COAPTransport.prototype._handle_request = function (req, res) {
     var self = this;
-    var user = iotdb.users.owner();  // TD: WRONG! needs to be the CoAP counterparty
+    var user = iotdb.users.owner(); // TD: WRONG! needs to be the CoAP counterparty
     var urlp = url.parse(req.url);
     var query = querystring.parse(urlp.query) || {};
 
@@ -141,10 +141,12 @@ COAPTransport.prototype._handle_request = function (req, res) {
         request_method: req.method,
     }, "CoAP request");
 
-    var _done = function(error, content, no_end) {
+    var _done = function (error, content, no_end) {
         if (error) {
             res.code = _.error.code(error);
-            content = { error: _.error.message(error) };
+            content = {
+                error: _.error.message(error)
+            };
         }
 
         content = content || "";
@@ -165,21 +167,21 @@ COAPTransport.prototype._handle_request = function (req, res) {
                 _done(null, JSON.stringify(content) + "\n", no_end);
             }
 
-            return
+            return;
         }
 
         res.write(content);
 
         if (!no_end) {
             res.end();
-        } 
+        }
     };
 
-    var _handle_get_core = function() {
+    var _handle_get_core = function () {
         self._get_core(_done);
     };
 
-    var _handle_get_things = function() {
+    var _handle_get_things = function () {
         self._get_things({
             id: null,
             band: null,
@@ -188,7 +190,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
         }, _done);
     };
 
-    var _handle_get_thing = function(id) {
+    var _handle_get_thing = function (id) {
         self._get_thing({
             id: id,
             band: null,
@@ -196,7 +198,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
         }, _done);
     };
 
-    var _handle_get_band = function(id, band) {
+    var _handle_get_band = function (id, band) {
         self._get_band({
             id: id,
             band: band,
@@ -204,19 +206,19 @@ COAPTransport.prototype._handle_request = function (req, res) {
         }, _done);
     };
 
-    var _handle_observe_band = function(id, band) {
+    var _handle_observe_band = function (id, band) {
         self._get_band({
             id: id,
             band: band,
             user: user,
-        }, function(error, result) {
+        }, function (error, result) {
             if (error) {
                 return _done(error, result);
             }
 
             _done(null, result, true);
 
-            var _emitted = function(ud) {
+            var _emitted = function (ud) {
                 if (ud.id !== id) {
                     return;
                 }
@@ -228,7 +230,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
                     id: id,
                     band: band,
                     user: user,
-                }, function(error, result) {
+                }, function (error, result) {
                     if (error) {
                         return;
                     }
@@ -239,13 +241,13 @@ COAPTransport.prototype._handle_request = function (req, res) {
 
             self._emitter.on("has-update", _emitted);
 
-            res.on("error", function() {
+            res.on("error", function () {
                 self._emitter.removeListener("has-update", _emitted);
             });
         });
     };
 
-    var _handle_get = function() {
+    var _handle_get = function () {
         if (urlp.pathname === "/.well-known/core") {
             _handle_get_core();
         } else if (urlp.pathname === self.root) {
@@ -262,7 +264,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
         }
     };
 
-    var _handle_observe = function() {
+    var _handle_observe = function () {
         if (urlp.pathname === "/.well-known/core") {
             _handle_get_core();
         } else if (urlp.pathname === self.root) {
@@ -279,7 +281,7 @@ COAPTransport.prototype._handle_request = function (req, res) {
         }
     };
 
-    var _handle_put = function() {
+    var _handle_put = function () {
         if (urlp.pathname.indexOf(self.root_slash) !== 0) {
             _done(new errors.MethodNotAllowed(), null);
             return;
@@ -447,10 +449,10 @@ COAPTransport.prototype._directory_things = function (paramd, done) {
         var rd = {
             "@cf": "application/link-format"
         };
-        ids.map(function(id) {
+        ids.map(function (id) {
             rd["/ts/" + id] = {
                 "cf": 40,
-            }
+            };
         });
 
         done(null, rd);
@@ -477,7 +479,7 @@ COAPTransport.prototype._get_thing = function (paramd, done) {
         };
 
         if (ld.bandd) {
-            _.mapObject(ld.bandd, function(url, band) {
+            _.mapObject(ld.bandd, function (url, band) {
                 if (url) {
                     rd[band] = url;
                 } else {
@@ -486,7 +488,7 @@ COAPTransport.prototype._get_thing = function (paramd, done) {
             });
         } else {
             var bands = _.ld.list(ld, "bands", []);
-            bands.map(function(band) {
+            bands.map(function (band) {
                 rd[band] = "./" + band;
             });
         }
@@ -508,7 +510,7 @@ COAPTransport.prototype._get_band = function (paramd, done) {
         if (error) {
             done(ld.error);
             done = noop;
-            return
+            return;
         }
 
         var rd = {
@@ -658,7 +660,7 @@ COAPTransport.prototype.remove = function (paramd, callback) {
 
     callback({
         error: new errors.NotImplemented(),
-    })
+    });
 };
 
 /* --- internals --- */
