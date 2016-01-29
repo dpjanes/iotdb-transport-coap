@@ -501,24 +501,25 @@ COAPTransport.prototype._get_band = function (paramd, done) {
         id: paramd.id,
         band: paramd.band,
         user: paramd.user,
-    }, function (ld) {
-        if (ld.error) {
+    }, function (error, ld) {
+        if (error) {
             done(ld.error);
             done = noop;
-        } else {
-            var rd = {
-                /*
-                 *  CoAP is really restrained
-                "@id": self.initd.channel(self.initd, paramd.id, paramd.band),
-                "@context": "https://iotdb.org/pub/iot",
-                 */
-            };
-
-            rd = _.d.compose.shallow(rd, ld.value);
-
-            done(null, rd);
-            done = noop;
+            return
         }
+
+        var rd = {
+            /*
+             *  CoAP is really restrained
+            "@id": self.initd.channel(self.initd, paramd.id, paramd.band),
+            "@context": "https://iotdb.org/pub/iot",
+             */
+        };
+
+        rd = _.d.compose.shallow(rd, ld.value);
+
+        done(null, rd);
+        done = noop;
     });
 };
 
@@ -526,13 +527,13 @@ COAPTransport.prototype._put_thing_band = function (paramd, done) {
     var self = this;
     var ids = [];
 
-    self.get({
+    self.put({
         id: paramd.id,
         band: paramd.band,
         value: paramd.value,
         user: paramd.user,
-    }, function (ld) {
-        if (ld.error) {
+    }, function (error, ld) {
+        if (error) {
             done(ld.error);
             done = noop;
             return;
@@ -608,7 +609,7 @@ COAPTransport.prototype.put = function (paramd, callback) {
     paramd = _.shallowCopy(paramd);
 
     self._emitter.emit("has-update", paramd);
-    callback(paramd);
+    callback(null, paramd);
 };
 
 /**

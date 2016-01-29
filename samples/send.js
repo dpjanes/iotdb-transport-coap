@@ -25,7 +25,8 @@ var _update = function() {
             last: "Janes",
             now: now,
         },
-    });
+    }, function(error, pd) {
+    };
 };
 
 setInterval(_update, 10 * 1000);
