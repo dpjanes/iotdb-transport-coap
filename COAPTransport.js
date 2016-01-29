@@ -460,36 +460,35 @@ COAPTransport.prototype._get_thing = function (paramd, done) {
     self.bands({
         id: paramd.id,
         user: paramd.user,
-    }, function (ld) {
-        if (ld.error) {
-            done(ld.error);
-            done = noop;
-        } else {
-            var rd = {
-                "@id": self.initd.channel(self.initd, self.id2alias(paramd.id)),
-                "@context": "https://iotdb.org/pub/iot",
-                "thing-id": paramd.id,
-            };
-
-            if (ld.bandd) {
-                _.mapObject(ld.bandd, function(url, band) {
-                    if (url) {
-                        rd[band] = url;
-                    } else {
-                        rd[band] = "./" + band;
-                    }
-                });
-            } else {
-                var bands = _.ld.list(ld, "bands", []);
-                bands.map(function(band) {
-                    rd[band] = "./" + band;
-                });
-            }
-
-
-            done(null, rd);
-            done = noop;
+    }, function (error, ld) {
+        if (error) {
+            done(error);
+            return;
         }
+
+        var rd = {
+            "@id": self.initd.channel(self.initd, self.id2alias(paramd.id)),
+            "@context": "https://iotdb.org/pub/iot",
+            "thing-id": paramd.id,
+        };
+
+        if (ld.bandd) {
+            _.mapObject(ld.bandd, function(url, band) {
+                if (url) {
+                    rd[band] = url;
+                } else {
+                    rd[band] = "./" + band;
+                }
+            });
+        } else {
+            var bands = _.ld.list(ld, "bands", []);
+            bands.map(function(band) {
+                rd[band] = "./" + band;
+            });
+        }
+
+
+        done(null, rd);
     });
 };
 
@@ -596,6 +595,17 @@ COAPTransport.prototype.get = function (paramd, callback) {
     var channel = self.initd.channel(self.initd, paramd.id, paramd.band);
 
     callback(new errors.NotImplemented(), null);
+};
+
+/**
+ *  See {iotdb_transport.Transport#bands} for documentation.
+ *  <p>
+ *  Inherently this does nothing. To properly support this
+ *  you should use <code>iotdb.transport.bind</code>
+ *  to effectively replace this function.
+ */
+COAPTransport.prototype.bands = function (paramd, callback) {
+    callback(new errors.NeverImplemented(), null);
 };
 
 /**
