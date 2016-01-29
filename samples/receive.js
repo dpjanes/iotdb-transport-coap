@@ -16,7 +16,12 @@ var transport = new Transport({
 transport.updated({
     id: "MyThingID", 
     band: "meta", 
-}, function(ud) {
+}, function(error, ud) {
+    if (error) {
+        console.log("#", error);
+        return;
+    }
+
     if (ud.value === undefined) {
         transport.get(ud, function(error, gd) {
             if (error) {

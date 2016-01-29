@@ -638,9 +638,7 @@ COAPTransport.prototype.updated = function (paramd, callback) {
             return;
         }
 
-        callback(ud, function(rud) {
-            // really should do something here
-        });
+        callback(null, ud);
     });
 };
 
