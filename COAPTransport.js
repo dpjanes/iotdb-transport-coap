@@ -575,7 +575,7 @@ COAPTransport.prototype.list = function (paramd, callback) {
 
     self._validate_list(paramd, callback);
 
-    ld = _.shallowCopy(paramd);
+    ld = _.d.clone.shallow(paramd);
     callback(new errors.NeverImplemented(), ld);
 };
 
@@ -622,7 +622,7 @@ COAPTransport.prototype.put = function (paramd, callback) {
 
     self._validate_update(paramd, callback);
 
-    paramd = _.shallowCopy(paramd);
+    paramd = _.d.clone.shallow(paramd);
 
     self._emitter.emit("has-update", paramd);
     callback(null, paramd);
@@ -656,7 +656,7 @@ COAPTransport.prototype.remove = function (paramd, callback) {
 
     self._validate_remove(paramd, callback);
 
-    var rd = _.shallowCopy(paramd);
+    var rd = _.d.clone.shallow(paramd);
     delete rd.band;
     delete rd.value;
 
