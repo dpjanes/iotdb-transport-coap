@@ -20,7 +20,7 @@ transport.list({}, function(error, ld) {
     }
     if (!ld) {
         console.log("+", "<end>");
-        break;
+        return;
     }
 
     console.log("+", ld.id);
