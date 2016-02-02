@@ -12,11 +12,10 @@ This is an **advanced** topic.
 The most common way you'll use this is with Home☆Star.
 
     $ homestar install iotdb-transport-coap
-    $ homestar install homestar-coap
 
 Then it has to be enabled
 
-    $ homestar set --boolean /transports/COAPTransport/enabled true
+    $ homestar set --boolean /enabled/transports/COAPTransport true
 
 Now when you run Home☆Star there'll be a CoAP server to
 your Things runing on UDP:22000.
