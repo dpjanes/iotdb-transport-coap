@@ -36,10 +36,10 @@ var logger = iotdb.logger({
 var COAPTransport = require('./COAPTransport').COAPTransport;
 
 var _transport_coap = function (iotdb_transporter) {
-    if (!iotdb.keystore().get("/enabled/transports/COAPTransport", false)) {
+    if (!iotdb.keystore().get("/enabled/homestar/COAPTransport", false)) {
         logger.error({
             method: "_transport_coap",
-            cause: "do $ homestar set --boolean /enabled/transports/COAPTransport false",
+            cause: "do $ homestar set --boolean /enabled/homestar/COAPTransport true",
         }, "Transporter not enabled");
         return;
     }
@@ -65,4 +65,6 @@ var on_ready = function (locals) {
 /**
  *  API
  */
-exports.on_ready = on_ready;
+module.exports = {
+    on_ready: on_ready,
+};

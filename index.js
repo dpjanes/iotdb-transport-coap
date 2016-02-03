@@ -27,8 +27,4 @@ exports.Transport = require('./COAPTransport').COAPTransport;
 /**
  *  HomeStar
  */
-var coap = require('./coap');
-
-exports.homestar = {
-    on_ready: coap.on_ready,
-};
+exports.homestar = require('./homestar');
