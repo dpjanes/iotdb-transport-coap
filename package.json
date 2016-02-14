@@ -5,9 +5,9 @@
     }, 
     "dependencies": {
         "coap": "~0.13.1", 
-        "iotdb": ">=0.12.0", 
-        "iotdb-links": "~0.0.3", 
-        "iotdb-transport": "~0.0.30"
+        "iotdb": ">=0.13.0", 
+        "iotdb-links": "~0.0.4", 
+        "iotdb-transport": "~0.0.31"
     }, 
     "description": "IOTDB Transport for COAP", 
     "devDependencies": {
@@ -35,5 +35,5 @@
         "cover": "istanbul cover _mocha tests", 
         "test": "grunt"
     }, 
-    "version": "0.0.12"
+    "version": "0.0.13"
 }
