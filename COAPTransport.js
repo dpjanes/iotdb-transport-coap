@@ -24,7 +24,7 @@
 
 var iotdb = require('iotdb');
 var iotdb_transport = require('iotdb-transport');
-var errors = iotdb_transport.errors;
+const errors = require('iotdb-errors');
 var iotdb_links = require('iotdb-links');
 var _ = iotdb._;
 
