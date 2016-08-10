@@ -24,6 +24,11 @@
 
 exports.Transport = require('./COAPTransport').COAPTransport;
 
+const transporter = require('./transporter');
+exports.make = transporter.make;
+
+
+
 /**
  *  HomeStar
  */
