@@ -1,17 +1,20 @@
-# iotdb-transport-prototype
-IOTDB / Home☆Star Transport for COAP
+# iotdb-transport-coap
+[IOTDB](https://github.com/dpjanes/node-iotdb) 
+[Transporter](https://github.com/dpjanes/node-iotdb/blob/master/docs/transporters.md)
+for
+[CoAP](http://coap.technology/)
 
 <img src="https://raw.githubusercontent.com/dpjanes/iotdb-homestar/master/docs/HomeStar.png" align="right" />
 
-This is an **advanced** topic. 
-[Documentation](https://homestar.io/about/transporters).
+# About
 
+* [Read more about Transporters](https://github.com/dpjanes/node-iotdb/blob/master/docs/transporters.md)
 
 # Installation
 
 The most common way you'll use this is with Home☆Star.
 
-    $ homestar install iotdb-transport-coap
+    $ npm install iotdb-transport-coap
 
 Then it has to be enabled
 

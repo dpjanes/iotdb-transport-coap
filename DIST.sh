@@ -31,6 +31,7 @@ echo "=================="
 
     tar cf - \
         --exclude "node_modules" \
+        --exclude "Gruntfile.js" \
         README.md LICENSE \
         homestar.json package.json \
         index.js COAPTransport.js homestar.js \
