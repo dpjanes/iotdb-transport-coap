@@ -16,12 +16,7 @@ The most common way you'll use this is with Home☆Star.
 
     $ npm install iotdb-transport-coap
 
-Then it has to be enabled
+Then just `use()` it
 
-    $ homestar set --boolean /enabled/transports/COAPTransport true
-
-Now when you run Home☆Star there'll be a CoAP server to
-your Things runing on UDP:22000.
-
-One important note: there is no security model right now
-with CoAP. So yeah, testing locally only.
+    const iotdb = require("iotdb")
+    iotdb.use("iotdb-transport-coap")
