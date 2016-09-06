@@ -34,7 +34,6 @@ const assert = require('assert');
 const querystring = require('querystring');
 
 const url = require('url');
-const events = require('events');
 
 const logger = iotdb.logger({
     name: 'iotdb-transport-redis',
@@ -60,8 +59,6 @@ const make = (initd, _coap_client, _underlying) => {
 
     const _root = _initd.channel(_initd, {});
     const _root_slash = _root + "/";
-
-    const _emitter = new events.EventEmitter();
 
     const _id2alias = id => id;
     const _alias2id = id => id;
@@ -147,59 +144,44 @@ const make = (initd, _coap_client, _underlying) => {
             _get_band({
                 id: id,
                 band: band,
-                user: user,
-            }, function (error, result) {
+            }, (error, result) => {
                 if (error) {
                     return _done(error, result);
                 }
 
                 _done(null, result, true);
 
-                var _emitted = function (ud) {
-                    if (ud.id !== id) {
-                        return;
-                    }
-                    if (ud.band !== band) {
-                        return;
-                    }
+                _underlying.updated({
+                    id: id,
+                    band: band,
+                })
+                    .subscribe(
+                        ud => {
+                            _get_band({
+                                id: id,
+                                band: band,
+                            }, (error, result) => {
+                                if (error) {
+                                    return;
+                                }
 
-                    _get_band({
-                        id: id,
-                        band: band,
-                        user: user,
-                    }, function (error, result) {
-                        if (error) {
-                            return;
+                                _done(null, result, true);
+                            })
                         }
-
-                        _done(null, result, true);
-                    });
-                };
-
-                self._emitter.on("has-update", _emitted);
-
-                res.on("error", function () {
-                    self._emitter.removeListener("has-update", _emitted);
-                });
+                    );
             });
         };
 
         const _handle_get = function () {
-            console.log("B.1", urlp.pathname);
             if (urlp.pathname === "/.well-known/core") {
-                console.log("B.2");
                 _handle_get_core();
             } else if (urlp.pathname === _root) {
-                console.log("B.3");
                 _handle_get_things();
             } else if (urlp.pathname.indexOf(_root_slash) === 0) {
                 const ud = _initd.unchannel(_initd, urlp.pathname);
-                console.log("B.4", ud);
                 if (_.is.Empty(ud.band)) {
-                    console.log("B.4.1");
                     _handle_get_thing(_alias2id(ud.id));
                 } else {
-                    console.log("B.4.2");
                     _handle_get_band(_alias2id(ud.id), ud.band);
                 }
             } else {
@@ -399,22 +381,18 @@ const make = (initd, _coap_client, _underlying) => {
     };
 
     const _get_band = function (paramd, done) {
-        console.log("HERE:C.0", paramd)
         _underlying.get({
             id: paramd.id,
             band: paramd.band,
         })
             .subscribe(
                 gd => {
-                    console.log("HERE:C.1")
                     // CoAP is really restrained - don't send JSON-LD stuff
                     done(null, gd.value);
                     done = _.noop;
-                    console.log("HERE:C.2")
                 },
                 error => {
                     console.trace()
-                    console.log("HERE:C.3", error);
                     done(error, null);
                     done = _.noop;
                 },
@@ -427,7 +405,6 @@ const make = (initd, _coap_client, _underlying) => {
     const _put_thing_band = function (paramd, done) {
         var ids = [];
 
-        console.log("HERE.1", paramd);
 
         _underlying.put({
             id: paramd.id,
@@ -437,12 +414,10 @@ const make = (initd, _coap_client, _underlying) => {
         })
             .subscribe(
                 pd => {
-                    console.log("HERE.2");
                     done(null, pd.value || {});
                     done = noop;
                 },
                 error => {
-                    console.log("HERE.3");
                     done(error);
                     done = _.noop;
                 },
@@ -458,9 +433,7 @@ const make = (initd, _coap_client, _underlying) => {
             console.log("=========");
 
             try {
-                console.log("A.1");
                 _handle_request(req, res);
-                console.log("A.2");
             } catch (x) {
                 logger.error({
                     method: "_setup_server/on('request')",
