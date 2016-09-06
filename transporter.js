@@ -229,8 +229,8 @@ const make = (initd, _coap_client, _underlying) => {
                 return _done(new errors.MethodNotAllowed(), null);
             }
 
-            const parts = _initd.unchannel(_initd, urlp.pathname);
-            if (parts[1] === '.') {
+            const ud = _initd.unchannel(_initd, urlp.pathname);
+            if (_.is.Empty(ud)) {
                 return _done(new errors.MethodNotAllowed(), null);
             }
 
@@ -256,8 +256,8 @@ const make = (initd, _coap_client, _underlying) => {
                 }
 
                 _put_thing_band({
-                    id: _alias2id(parts[0]),
-                    band: parts[1],
+                    id: ud.id,
+                    band: ud.band,
                     value: value,
                     user: user,
                 }, _done);
@@ -419,6 +419,7 @@ const make = (initd, _coap_client, _underlying) => {
                     done = _.noop;
                 },
                 () => {
+                    done(new errors.Internal("Should never get here"));
                 }
             );
     };
@@ -426,36 +427,28 @@ const make = (initd, _coap_client, _underlying) => {
     const _put_thing_band = function (paramd, done) {
         var ids = [];
 
-        self.put({
+        console.log("HERE.1", paramd);
+
+        _underlying.put({
             id: paramd.id,
             band: paramd.band,
             value: paramd.value,
             user: paramd.user,
-        }, function (error, ld) {
-            if (error) {
-                done(ld.error);
-                done = noop;
-                return;
-            }
-
-            _.timestamp.update(paramd.value);
-
-            self._emitter.emit("request-updated", {
-                id: paramd.id,
-                band: paramd.band,
-                value: paramd.value,
-                user: paramd.user,
-            });
-
-            // kinda a BS result
-            var rd = {
-                "@id": _initd.channel(_initd, _alias2id(paramd.id), paramd.band),
-                "@context": "https://iotdb.org/pub/iot",
-            };
-
-            done(null, rd);
-            done = noop;
-        });
+        })
+            .subscribe(
+                pd => {
+                    console.log("HERE.2");
+                    done(null, pd.value || {});
+                    done = noop;
+                },
+                error => {
+                    console.log("HERE.3");
+                    done(error);
+                    done = _.noop;
+                },
+                done => {
+                    done(new errors.Internal("Should never get here"));
+                });
     };
 
     const _setup_server = () => {
