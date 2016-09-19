@@ -42,6 +42,7 @@ const logger = iotdb.logger({
 
 const make = (initd, _coap_client, _underlying) => {
     const self = iotdb_transport.make();
+    self.name = "iotdb-transport-coap";
 
     assert.ok(_underlying);
     assert.ok(_coap_client);

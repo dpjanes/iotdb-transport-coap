@@ -8,15 +8,30 @@ for
 
 # About
 
+This module will export everything to CoAP, allowing GET and PUT and OBSERVE operations.
+Note that there is no authentication / user support at this time, so only
+use within friendly environments.
+
+There are code samples in GitHub.
+
 * [Read more about Transporters](https://github.com/dpjanes/node-iotdb/blob/master/docs/transporters.md)
 
 # Installation
 
-The most common way you'll use this is with Home☆Star.
+Do:
 
     $ npm install iotdb-transport-coap
 
-Then just `use()` it
+Then:
 
-    const iotdb = require("iotdb")
-    iotdb.use("iotdb-transport-coap")
+    const iotdb = require("iotdb");
+    iotdb.use("homestar-wemo");
+
+    const iotdb_transport_iotdb = require("iotdb-transport-iotdb");
+    const iotdb_transport_coap = require("iotdb-transport-coap")
+
+    const iotdb_transporter = iotdb_transport_iotdb.make({}, iotdb.connect("WeMoSocket"));
+
+    const coap_client = iotdb_transport_coap.connect({});
+
+    const coap_transporter = iotdb_transport_coap.make({}, coap_client, iotdb_transporter)

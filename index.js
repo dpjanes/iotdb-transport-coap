@@ -22,14 +22,8 @@
 
 "use strict";
 
-exports.Transport = require('./COAPTransport').COAPTransport;
-
 const transporter = require('./transporter');
 exports.make = transporter.make;
 
-
-
-/**
- *  HomeStar
- */
-exports.homestar = require('./homestar');
+const connect = require('./connect');
+exports.connect = connect.connect;
