@@ -25,13 +25,13 @@ Do:
 Then:
 
     const iotdb = require("iotdb");
-    iotdb.use("homestar-wemo");
-
     const iotdb_transport_iotdb = require("iotdb-transport-iotdb");
     const iotdb_transport_coap = require("iotdb-transport-coap")
 
-    const iotdb_transporter = iotdb_transport_iotdb.make({}, iotdb.connect("WeMoSocket"));
+    iotdb.use("homestar-wemo");
+    iotdb.connect("WeMoSocket");
+
+    const iotdb_transporter = iotdb_transport_iotdb.make({});
 
     const coap_client = iotdb_transport_coap.connect({});
-
-    const coap_transporter = iotdb_transport_coap.make({}, coap_client, iotdb_transporter)
+    const coap_transporter = iotdb_transport_coap.make({}, iotdb_transporter, coap_client);

@@ -40,7 +40,7 @@ const logger = iotdb.logger({
     module: 'transporter',
 });
 
-const make = (initd, _coap_client, _underlying) => {
+const make = (initd, _underlying, _coap_client) => {
     const self = iotdb_transport.make();
     self.name = "iotdb-transport-coap";
 

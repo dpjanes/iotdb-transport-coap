@@ -38,4 +38,4 @@ const coap_client = coap_connect.connect({});
 
 // this is the actual transporter
 const coap_transport = require("../transporter")
-const coap_transporter = coap_transport.make({}, coap_client, iotdb_transporter)
+const coap_transporter = coap_transport.make({}, iotdb_transporter, coap_client);
